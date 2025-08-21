@@ -1,0 +1,36 @@
+@startuml
+actor Client
+participant Router
+participant AuthService
+participant UserRepository
+participant AuthUtils
+participant TokenService
+
+Client -> Router : POST /login (email, password)
+Router -> Router : validateLoginRequestFormat(email, password)
+alt Format invalid
+    Router -> Client : 400 Bad Request
+else Format valid
+    Router -> AuthService : login(email, password)
+
+    AuthService -> UserRepository : findByEmail(email)
+    UserRepository --> AuthService : userRecord (email, passwordHash)
+
+    alt User not found
+        AuthService -> Router : return error
+        Router -> Client : 401 Unauthorized
+    else User found
+        AuthService -> AuthUtils : verifyPassword(password, userRecord.passwordHash)
+        alt Passwords match
+            AuthService -> TokenService : createToken(userRecord.userId)
+            TokenService --> AuthService : token
+
+            AuthService -> Router : return token
+            Router -> Client : 200 OK + token
+        else Passwords do not match
+            AuthService -> Router : return error
+            Router -> Client : 401 Unauthorized
+        end
+    end
+end
+@enduml

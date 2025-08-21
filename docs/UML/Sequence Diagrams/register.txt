@@ -1,0 +1,40 @@
+@startuml
+title Sequence Diagram: POST /register — With UserRepository
+
+actor Client
+participant Router
+participant UserService
+participant AuthUtils
+participant UserRepository
+database UsersDB
+
+Client -> Router : POST /register\nBody: email, password
+Router -> Router : validateRequestFormat()
+
+Router -> UserService : register_user(email, password)
+
+UserService -> UserRepository : find_by_email(email)
+UserRepository -> UsersDB : SELECT * FROM users WHERE email = ?
+
+alt User already exists
+    UsersDB --> UserRepository : existing_user
+    UserRepository --> UserService : existing_user
+
+    UserService -> Router : raise ConflictError
+    Router -> Client : 409 Conflict — User already exists
+else No user found
+    UsersDB --> UserRepository : null
+    UserRepository --> UserService : null
+
+    UserService -> AuthUtils : hash_password(password)
+    AuthUtils --> UserService : hashed_password
+
+    UserService -> UserRepository : create_user(email, hashed_password)
+    UserRepository -> UsersDB : INSERT INTO users (email, password_hash)
+    UsersDB --> UserRepository : success
+    UserRepository --> UserService : success
+
+    UserService -> Router : return success
+    Router -> Client : 201 Created
+end
+@enduml

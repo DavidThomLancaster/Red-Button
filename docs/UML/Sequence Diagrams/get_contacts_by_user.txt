@@ -1,0 +1,29 @@
+@startuml
+actor Client
+participant Router
+participant AuthService
+participant ContactService
+participant DB
+
+Client -> Router : GET /contacts\nAuthorization: Bearer <token>
+Router -> Router : extractToken(headers) : token
+
+Router -> AuthService : validateToken(token)
+alt Token invalid
+    AuthService -> Router : raise UnauthorizedError
+    Router -> Client : 401 Unauthorized
+else Token valid
+    Router -> AuthService : getUserIdFromToken(token)
+    AuthService --> Router : user_id
+
+    Router -> ContactService : get_contacts(user_id)
+
+    ContactService -> DB : fetch_contacts_by_user(user_id)
+    DB --> ContactService : contacts[]
+
+    ContactService -> ContactService : serialize_contacts(contacts) : List[dict]
+
+    ContactService -> Router : return serialized_contacts
+    Router -> Client : 200 OK + JSON(serialized_contacts)
+end
+@enduml

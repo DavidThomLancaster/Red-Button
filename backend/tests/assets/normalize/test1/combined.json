@@ -1,0 +1,26 @@
+{
+  "Plumber": [
+    {
+      "note": "Install water heater and connect to main line",
+      "pages": ["3", "4"]
+    }
+  ],
+  "Power": [
+    {
+      "note": "Install main breaker panel in utility room",
+      "pages": ["5"]
+    }
+  ],
+  "HVAC": [
+    {
+      "note": "Run ducting in crawlspace",
+      "pages": ["6", "7"]
+    }
+  ],
+  "Lighting": [
+    {
+      "note": "Install recessed lighting in conference room",
+      "pages": ["8"]
+    }
+  ]
+}

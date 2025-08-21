@@ -1,0 +1,48 @@
+{
+  "Electrical": [
+    {
+      "note": "Install main breaker panel in utility room",
+      "pages": [
+        "5"
+      ],
+      "contacts": []
+    },
+    {
+      "note": "Install recessed lighting in conference room",
+      "pages": [
+        "8"
+      ],
+      "contacts": []
+    }
+  ],
+  "HVAC": [
+    {
+      "note": "Run ducting in crawlspace",
+      "pages": [
+        "6",
+        "7"
+      ],
+      "contacts": []
+    }
+  ],
+  "Plumbing": [
+    {
+      "note": "Install water heater and connect to main line",
+      "pages": [
+        "3",
+        "4"
+      ],
+      "contacts": []
+    }
+  ],
+  "metadata": {
+    "processing_steps": [
+      "normalized",
+      "contacts_mapped"
+    ],
+    "job": {
+      "user_id": "user_1",
+      "job_id": "job_1"
+    }
+  }
+}

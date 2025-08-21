@@ -1,0 +1,44 @@
+{
+  "Plumbing": [
+    {
+      "note": "New tank and vault installation, low and high pressure lines",
+      "pages": ["11", "12"]
+    }
+  ],
+  "Electrical": [
+    {
+      "note": "Existing electrical panel to be protected per drawings",
+      "pages": ["14"]
+    }
+  ],
+  "Surveying": [
+    {
+      "note": "Control points and benchmarks established using GPS",
+      "pages": ["5"]
+    }
+  ],
+  "Hydraulic": [
+    {
+      "note": "Ensign Downs pump station and pressure zones",
+      "pages": ["6", "7"]
+    }
+  ],
+  "Environmental": [
+    {
+      "note": "Erosion control plans with silt fence and straw wattle",
+      "pages": ["8", "9"]
+    }
+  ],
+  "Site Preparation": [
+    {
+      "note": "Mobilization plan including access paths and staging areas",
+      "pages": ["10"]
+    }
+  ],
+  "Demolition": [
+    {
+      "note": "Removal of existing gates, valves, and piping; protection of existing features",
+      "pages": ["13", "14"]
+    }
+  ]
+}

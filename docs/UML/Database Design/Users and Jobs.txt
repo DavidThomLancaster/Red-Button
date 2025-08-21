@@ -1,0 +1,21 @@
+@startuml
+entity Users {
+  * user_id : UUID <<PK>>
+  --
+  email : VARCHAR <<UNIQUE>>
+  password_hash : VARCHAR
+  created_at : TIMESTAMP
+}
+
+entity Jobs {
+  * job_id : UUID <<PK>>
+  --
+  user_id : UUID <<FK>>
+  name : VARCHAR
+  notes : TEXT
+  status : ENUM
+  created_at : TIMESTAMP
+}
+
+Users ||--o{ Jobs : "has"
+@enduml

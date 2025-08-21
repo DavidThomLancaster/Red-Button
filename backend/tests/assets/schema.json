@@ -1,0 +1,20 @@
+{
+  "schema_version": "2025-07-15",
+  "trades": [
+    {
+      "name": "Plumbing",
+      "aliases": ["Plumber", "Water Lines", "Sanitary Sewer"],
+      "description": "Handles piping, fixtures, and waste systems."
+    },
+    {
+      "name": "Electrical",
+      "aliases": ["Electrician", "Power", "Lighting"],
+      "description": "Installs wiring, panels, and lighting systems."
+    },
+    {
+      "name": "HVAC",
+      "aliases": ["Mechanical", "Ventilation", "Heating", "Air Conditioning"],
+      "description": "Installs climate control systems."
+    }
+  ]
+}

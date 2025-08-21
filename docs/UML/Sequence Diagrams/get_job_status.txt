@@ -1,0 +1,39 @@
+@startuml
+title Sequence Diagram: GET /jobs/:job_id/status — Check Job Status
+
+actor Client
+participant Router
+participant AuthService
+participant JobService
+database JobsDB
+
+Client -> Router : GET /jobs/:job_id/status\nAuthorization: Bearer <token>
+Router -> Router : extract job_id from path
+Router -> AuthService : validateToken(token)
+alt Token invalid
+    AuthService -> Router : raise UnauthorizedError
+    Router -> Client : 401 Unauthorized
+else Token valid
+    Router -> AuthService : getUserIdFromToken(token)
+    AuthService --> Router : user_id
+
+    Router -> JobService : get_job_status(user_id, job_id)
+
+    JobService -> JobsDB : SELECT * FROM jobs WHERE job_id = ?
+    alt Job not found
+        JobsDB --> JobService : null
+        JobService -> Router : raise NotFoundError
+        Router -> Client : 404 Job Not Found
+    else Job exists
+        JobsDB --> JobService : job_record
+
+        alt job_record.user_id != user_id
+            JobService -> Router : raise ForbiddenError
+            Router -> Client : 403 Forbidden
+        else Authorized
+            JobService -> Router : return job status + metadata
+            Router -> Client : 200 OK + JSON { status, created_at, updated_at, name, etc. }
+        end
+    end
+end
+@enduml

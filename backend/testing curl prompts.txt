@@ -1,0 +1,19 @@
+curl -X POST "http://127.0.0.1:8001/create_job" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkxZGNjN2EtYWFmZC00NDQ2LTk1NzUtZWVlZWYzMmI1YjgzIiwiZXhwIjoxODA4MDcwNDEyfQ.GExVYIxzOWNpL6UKht6hVGREvGswzOBMgNOQDZJDKk4" \
+     -d '{"name":"New Project","notes":"Finish ASAP2"}'
+
+curl -X GET "http://127.0.0.1:8001/get_job" \
+     -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkxZGNjN2EtYWFmZC00NDQ2LTk1NzUtZWVlZWYzMmI1YjgzIiwiZXhwIjoxODA4MDcwNDEyfQ.GExVYIxzOWNpL6UKht6hVGREvGswzOBMgNOQDZJDKk4"
+
+
+curl -X POST "http://127.0.0.1:8001/submit_pdf" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkxZGNjN2EtYWFmZC00NDQ2LTk1NzUtZWVlZWYzMmI1YjgzIiwiZXhwIjoxODA4MDcwNDEyfQ.GExVYIxzOWNpL6UKht6hVGREvGswzOBMgNOQDZJDKk4" \
+  -F "job_id=33a5b98d-5324-4ff2-9bbb-db286d3e6e42" \
+  -F "pdf_file=@C:\Users\white\Desktop\RedButton\Plans.pdf"
+
+curl -X GET "http://localhost:8001/jobs/33a5b98d-5324-4ff2-9bbb-db286d3e6e42" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiNjkxZGNjN2EtYWFmZC00NDQ2LTk1NzUtZWVlZWYzMmI1YjgzIiwiZXhwIjoxODA4MDcwNDEyfQ.GExVYIxzOWNpL6UKht6hVGREvGswzOBMgNOQDZJDKk4" \
+  -H "Content-Type: application/json"
+
+ python -m pytest -s tests/test_combine_to_json.py -v

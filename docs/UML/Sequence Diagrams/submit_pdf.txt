@@ -1,0 +1,92 @@
+@startuml
+title Sequence Diagram: /submit_pdf — JobService Orchestrates CoreFunctions with ContactsRepository
+
+actor Client
+participant Router
+participant AuthService
+participant JobService
+participant JobRepository
+participant FileManager
+participant PromptService
+participant CoreFunctions
+participant ContactsRepository
+
+Client -> Router : POST /submit_pdf\nAuthorization: Bearer <token>\nBody: PDF file, job_id
+Router -> Router : validateUploadRequest()
+
+Router -> AuthService : validateToken(token)
+alt Token invalid
+    AuthService -> Router : raise UnauthorizedError
+    Router -> Client : 401 Unauthorized
+else Token valid
+    Router -> AuthService : getUserIdFromToken(token)
+    AuthService --> Router : user_id
+
+    Router -> JobService : submit_pdf(user_id, job_id, pdf_file)
+
+    JobService -> JobRepository : get_owner_id(job_id)
+    JobRepository --> JobService : job_owner_id
+    alt Job not found
+        JobRepository --> JobService : null
+        JobService -> Router : raise NotFoundError
+        Router -> Client : 404 Job Not Found
+    else Job found
+        alt user_id != job_owner_id
+            JobService -> Router : raise ForbiddenError
+            Router -> Client : 403 Forbidden
+        else Authorized
+
+            JobService -> FileManager : save_pdf(user_id, job_id, pdf_file)
+            FileManager --> JobService : pdf_ref
+            JobService -> JobRepository : update_status(job_id, 'pdf_saved', pdf_ref)
+
+            JobService -> CoreFunctions : extract_images(pdf_ref)
+            CoreFunctions -> FileManager : save_images(pdf_ref)
+            FileManager --> CoreFunctions : images_ref
+            CoreFunctions --> JobService : images_ref
+            JobService -> JobRepository : update_status(job_id, 'images_extracted', images_ref)
+
+            JobService -> PromptService : get_active_prompt(user_id)
+            PromptService -> FileManager : load_prompt(user_id)
+            FileManager --> PromptService : prompt_ref
+            PromptService --> JobService : prompt_ref
+            JobService -> JobRepository : update_status(job_id, 'prompt_loaded', prompt_ref)
+
+            JobService -> CoreFunctions : run_llm_on_images(images_ref, prompt_ref)
+            CoreFunctions -> FileManager : save_csvs(images_ref, prompt_ref)
+            FileManager --> CoreFunctions : csv_ref
+            CoreFunctions --> JobService : csv_ref
+            JobService -> JobRepository : update_status(job_id, 'llm_complete', csv_ref)
+
+            JobService -> CoreFunctions : combine_to_json(csv_ref)
+            CoreFunctions -> FileManager : save_combined_json(csv_ref)
+            FileManager --> CoreFunctions : combined_ref
+            CoreFunctions --> JobService : combined_ref
+            JobService -> JobRepository : update_status(job_id, 'combined', combined_ref)
+
+            JobService -> FileManager : get_schema("trade_schema")
+            FileManager --> JobService : schema_ref
+            JobService -> JobRepository : update_status(job_id, 'schema_loaded', schema_ref)
+
+            JobService -> CoreFunctions : normalize_json(combined_ref, schema_ref)
+            CoreFunctions -> FileManager : save_normalized_json(combined_ref, schema_ref)
+            FileManager --> CoreFunctions : normalized_ref
+            CoreFunctions --> JobService : normalized_ref
+            JobService -> JobRepository : update_status(job_id, 'normalized', normalized_ref)
+
+            JobService -> ContactsRepository : get_contacts_for_trades(user_id, normalized_ref)
+            ContactsRepository --> JobService : contacts_ref
+            JobService -> JobRepository : update_status(job_id, 'contacts_loaded', contacts_ref)
+
+            JobService -> CoreFunctions : map_contacts_to_trades(normalized_ref, contacts_ref)
+            CoreFunctions -> FileManager : save_contact_mapping(normalized_ref, contacts_ref)
+            FileManager --> CoreFunctions : contacts_mapped_ref
+            CoreFunctions --> JobService : contacts_mapped_ref
+            JobService -> JobRepository : update_status(job_id, 'contacts_mapped', contacts_mapped_ref)
+
+            JobService -> Router : return { normalized_ref, contacts_mapped_ref }
+            Router -> Client : 200 OK + JSON(normalized_ref, contacts_mapped_ref)
+        end
+    end
+end
+@enduml

@@ -1,0 +1,62 @@
+@startuml
+title Sequence Diagram: POST /send_emails — With JobRepository + EmailLogRepository
+
+actor Client
+participant Router
+participant AuthService
+participant EmailService
+participant JobRepository
+participant EmailLogRepository
+participant FileManager
+participant EmailAPI
+database JobsDB
+database EmailLogsDB
+
+Client -> Router : POST /send_emails\nAuthorization: Bearer <token>\nBody: { job_id }
+Router -> Router : validateRequestFormat()
+
+Router -> AuthService : validateToken(token)
+alt Token invalid
+    AuthService -> Router : raise UnauthorizedError
+    Router -> Client : 401 Unauthorized
+else Token valid
+    Router -> AuthService : getUserIdFromToken(token)
+    AuthService --> Router : user_id
+
+    Router -> EmailService : send_emails(user_id, job_id)
+
+    EmailService -> JobRepository : get_job_by_id(job_id)
+    JobRepository -> JobsDB : SELECT * FROM jobs WHERE job_id = ?
+    alt Invalid job
+        JobsDB --> JobRepository : null
+        JobRepository --> EmailService : null
+        EmailService -> Router : raise error
+        Router -> Client : 403 or 404
+    else Valid job
+        JobsDB --> JobRepository : job_record
+        JobRepository --> EmailService : job_record
+
+        alt job_record.user_id != user_id
+            EmailService -> Router : raise ForbiddenError
+            Router -> Client : 403 Forbidden
+        else Authorized
+
+            EmailService -> FileManager : load_drafts(job_id)
+            FileManager --> EmailService : drafts_list
+
+            loop for each draft in drafts_list
+                EmailService -> EmailAPI : send_email(to, subject, body)
+                EmailAPI --> EmailService : send_result
+
+                EmailService -> EmailLogRepository : log_send(user_id, job_id, to, status)
+                EmailLogRepository -> EmailLogsDB : INSERT INTO email_logs (...)
+                EmailLogsDB --> EmailLogRepository : success
+                EmailLogRepository --> EmailService : success
+            end
+
+            EmailService -> Router : return send summary
+            Router -> Client : 200 OK + summary
+        end
+    end
+end
+@enduml

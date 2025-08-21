@@ -1,0 +1,43 @@
+@startuml
+title Sequence Diagram: POST /jobs — Create New Job with JobRepository
+
+actor Client
+participant Router
+participant AuthService
+participant JobService
+participant JobRepository
+participant FileManager
+database JobsDB
+
+Client -> Router : POST /create_job\nAuthorization: Bearer <token>\nBody: { name, notes }
+Router -> Router : validateRequestFormat()
+
+Router -> AuthService : validateToken(token)
+alt Token invalid
+    AuthService -> Router : raise UnauthorizedError
+    Router -> Client : 401 Unauthorized
+else Token valid
+    Router -> AuthService : getUserIdFromToken(token)
+    AuthService --> Router : user_id
+
+    Router -> JobService : create_job(user_id, job_name, notes)
+
+    JobService -> JobService : generate job_id (UUID)
+
+    JobService -> JobRepository : insert_new_job(job_id, user_id, job_name, notes)
+    JobRepository -> JobsDB : INSERT INTO jobs (job_id, user_id, name, notes, status, created_at)
+    JobsDB --> JobRepository : success
+    JobRepository --> JobService : success
+
+    JobService -> FileManager : create_job_folder(user_id, job_id)
+    FileManager --> JobService : job_folder_path
+
+    JobService -> JobRepository : update_folder_path(job_id, job_folder_path)
+    JobRepository -> JobsDB : UPDATE jobs SET folder_path = ? WHERE job_id = ?
+    JobsDB --> JobRepository : success
+    JobRepository --> JobService : success
+
+    JobService -> Router : return job_id
+    Router -> Client : 201 Created + job_id
+end
+@enduml

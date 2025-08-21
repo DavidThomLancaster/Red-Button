@@ -1,0 +1,57 @@
+@startuml
+title Sequence Diagram: POST /generate_emails — With JobRepository
+
+actor Client
+participant Router
+participant AuthService
+participant EmailService
+participant JobRepository
+participant FileManager
+database JobsDB
+
+Client -> Router : POST /generate_emails\nAuthorization: Bearer <token>\nBody: { job_id }
+Router -> Router : validateRequestFormat()
+
+Router -> AuthService : validateToken(token)
+alt Token invalid
+    AuthService -> Router : raise UnauthorizedError
+    Router -> Client : 401 Unauthorized
+else Token valid
+    Router -> AuthService : getUserIdFromToken(token)
+    AuthService --> Router : user_id
+
+    Router -> EmailService : generate_email_drafts(user_id, job_id)
+
+    EmailService -> JobRepository : get_job_by_id(job_id)
+    JobRepository -> JobsDB : SELECT * FROM jobs WHERE job_id = ?
+    alt Job not found
+        JobsDB --> JobRepository : null
+        JobRepository --> EmailService : null
+        EmailService -> Router : raise NotFoundError
+        Router -> Client : 404 Job Not Found
+    else Job exists
+        JobsDB --> JobRepository : job_record
+        JobRepository --> EmailService : job_record
+
+        alt job_record.user_id != user_id
+            EmailService -> Router : raise ForbiddenError
+            Router -> Client : 403 Forbidden
+        else Authorized
+
+            EmailService -> FileManager : load_trade_to_contacts_json(job_id)
+            FileManager --> EmailService : trade_to_contacts_dict
+
+            EmailService -> FileManager : load_email_template(user_id)
+            FileManager --> EmailService : email_template_text
+
+            EmailService -> EmailService : generate personalized drafts
+
+            EmailService -> FileManager : save_drafts(job_id, drafts_list)
+            FileManager --> EmailService : drafts_file_path
+
+            EmailService -> Router : return drafts_file_path
+            Router -> Client : 200 OK + drafts_file_path
+        end
+    end
+end
+@enduml

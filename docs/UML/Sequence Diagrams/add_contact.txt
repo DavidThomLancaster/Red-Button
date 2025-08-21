@@ -1,0 +1,32 @@
+@startuml
+title Sequence Diagram: POST /contacts — Add Contact with ContactRepository
+
+actor Client
+participant Router
+participant AuthService
+participant ContactService
+participant ContactRepository
+database ContactsDB
+
+Client -> Router : POST /add_contact\nAuthorization: Bearer <token>\nBody: contact fields
+Router -> Router : validateRequestFormat()
+
+Router -> AuthService : validateToken(token)
+alt Token invalid
+    AuthService -> Router : raise UnauthorizedError
+    Router -> Client : 401 Unauthorized
+else Token valid
+    Router -> AuthService : getUserIdFromToken(token)
+    AuthService --> Router : user_id
+
+    Router -> ContactService : add_contact(user_id, contact_data)
+
+    ContactService -> ContactRepository : insert_contact(user_id, contact_data)
+    ContactRepository -> ContactsDB : INSERT INTO contacts (user_id, name, email, trade, company, phone)
+    ContactsDB --> ContactRepository : contact_id
+    ContactRepository --> ContactService : contact_id
+
+    ContactService -> Router : return contact_id
+    Router -> Client : 201 Created + contact_id
+end
+@enduml
