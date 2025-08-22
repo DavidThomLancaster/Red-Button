@@ -68,15 +68,6 @@ class JobRepository:
         row = cur.fetchone()
         return row["user_id"] if row else None
 
-    # def update_status_pdf_saved(self, job_id: str, pdf_ref: str):
-    #     cur = self.conn.cursor()
-    #     print("Hi from the Job Repository in update_status_pdf_saved " + pdf_ref + " : " + job_id)
-    #     cur.execute(
-    #         "UPDATE jobs SET status = ?, pdf_ref = ? WHERE job_id = ?",
-    #         ("pdf_saved", pdf_ref, job_id)
-    #     )
-    #     self.conn.commit()
-
     def update_status_pdf_saved(self, job_id: str, pdf_ref: StorageRef):
         cur = self.conn.cursor()
        # print("Hi from the Job Repository in update_status_pdf_saved " + pdf_ref.location + " : " + job_id)
@@ -199,89 +190,3 @@ class JobRepository:
 
         return StorageRef(location=loc, mode=mode)
 
-    # def get_contacts_map_ref(self, job_id: str) -> Optional[str]:
-    #     cur = self.conn.cursor()
-    #     cur.execute("SELECT current_mapped_contacts_ref FROM jobs WHERE job_id = ?", (job_id,))
-    #     row = cur.fetchone()
-    #     return row["current_mapped_contacts_ref"] if row and row["current_mapped_contacts_ref"] else None
-
-   
-
-
-
-
-
-
-
-
-# # TODO - In production, handle connection pooling & proper closing
-# # TODO - Build part that has updating job folder path and stuff. View Squence diagram for details
-
-# class JobRepository:
-#     def __init__(self, db_path="jobs.db", conn: sqlite3.Connection = None):
-#         if conn:
-#             self.conn = conn
-#         else:
-#             self.conn = sqlite3.connect(db_path, check_same_thread=False)
-
-#         self.conn.row_factory = sqlite3.Row  # enables dict-like access
-#         self.conn.execute('''
-#             CREATE TABLE IF NOT EXISTS jobs (
-#                 job_id TEXT PRIMARY KEY,
-#                 user_id TEXT NOT NULL,
-#                 name TEXT NOT NULL,
-#                 notes TEXT,
-#                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-#             )
-#         ''')
-#         self.conn.commit()
-
-#     def insert_new_job(self, user_id: str, job_name: str, notes: Optional[str] = None) -> str:
-#         job_id = str(uuid.uuid4())
-#         cur = self.conn.cursor()
-#         cur.execute(
-#             "INSERT INTO jobs (job_id, user_id, name, notes) VALUES (?, ?, ?, ?)",
-#             (job_id, user_id, job_name, notes)
-#         )
-#         self.conn.commit()
-#         return job_id
-
-#     def get_jobs_by_user(self, user_id: str) -> List[Dict]:
-#         cur = self.conn.cursor()
-#         cur.execute("SELECT * FROM jobs WHERE user_id = ?", (user_id,))
-#         rows = cur.fetchall()
-#         return [dict(row) for row in rows] if rows else []
-
-#     def get_job_by_id(self, job_id: str) -> Optional[Dict]:
-#         cur = self.conn.cursor()
-#         cur.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,))
-#         row = cur.fetchone()
-#         return dict(row) if row else None
-    
-#     def get_owner_id(job_id):
-#         cur = self.conn.cursor()
-#         cur.execute("SELECT user_id FROM jobs WHERE job_id = ?", (job_id,))
-#         row = cur.fetchone()
-#         return row["user_id"] if row else None
-
-
-#     # Maybe we make an enum.py in core to inform this... maybe not. 
-#     def update_status(job_id, images_extracted, image_output_dir):
-#         pass
-#         # TODO...
-
-#     def update_status(job_id, pdf_saved, image_output_dir):
-#         pass
-#         # TODO...
-
-#     def update_status(job_id, prompt_loaded, image_output_dir):
-#         pass
-#         # TODO...
-
-#     def update_status_pdf_saved(self, job_id: str, pdf_ref: str):
-#         cur = self.conn.cursor()
-#         cur.execute(
-#             "UPDATE jobs SET status = ?, pdf_ref = ? WHERE job_id = ?",
-#             ("pdf_saved", pdf_ref, job_id)
-#         )
-#         self.conn.commit()

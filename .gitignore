@@ -43,6 +43,7 @@ jobs.db
 contacts.db
 prompts.db
 users.db
+app.db
 
 
 
