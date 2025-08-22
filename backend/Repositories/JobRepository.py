@@ -174,12 +174,36 @@ class JobRepository:
         self.conn.commit()
         return cur.rowcount > 0
     
-
-    def get_contacts_map_ref(self, job_id: str) -> Optional[str]:
+    # needs to return the full reference and not just the path.
+    def get_contacts_map_ref(self, job_id: str) -> Optional[StorageRef]:
         cur = self.conn.cursor()
-        cur.execute("SELECT current_mapped_contacts_ref FROM jobs WHERE job_id = ?", (job_id,))
+        cur.execute("""
+            SELECT current_mapped_contacts_ref, jsons_mode
+            FROM jobs
+            WHERE job_id = ?
+        """, (job_id,))
         row = cur.fetchone()
-        return row["current_mapped_contacts_ref"] if row and row["current_mapped_contacts_ref"] else None
+        if not row:
+            return None
+
+        loc = row["current_mapped_contacts_ref"]
+        if not loc:
+            return None
+
+        mode_str = row["jsons_mode"] or "local"
+        try:
+            # StorageMode values are "local", "s3", "gcs"
+            mode = StorageMode(mode_str.strip().lower())
+        except Exception:
+            mode = StorageMode.LOCAL
+
+        return StorageRef(location=loc, mode=mode)
+
+    # def get_contacts_map_ref(self, job_id: str) -> Optional[str]:
+    #     cur = self.conn.cursor()
+    #     cur.execute("SELECT current_mapped_contacts_ref FROM jobs WHERE job_id = ?", (job_id,))
+    #     row = cur.fetchone()
+    #     return row["current_mapped_contacts_ref"] if row and row["current_mapped_contacts_ref"] else None
 
    
 

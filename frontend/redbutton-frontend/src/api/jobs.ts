@@ -26,6 +26,11 @@ export const getJobAPI = (token: string, jobId: string) =>
 //     `/jobs/${encodeURIComponent(jobId)}/contacts-map`, {}, token
 //   );
 
+export const generateEmailsApi = (token: string, job_id: string) =>
+  apiFetch<{ status: string; job_id: string }>(`/generate_emails/${encodeURIComponent(job_id)}`, {
+    method: "POST",
+  }, token);
+
 const BASE = import.meta.env.VITE_API_BASE;
 
 // TODO - Perhaps I should modify this to work with clients.ts like the other functions.

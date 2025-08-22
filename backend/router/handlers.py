@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Header, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, status, Header, Depends, UploadFile, File, Form, Request
 from Services.UserService import UserService
 from Utils.AuthUtils import hash_password, get_user_id_from_header
 from models.user_models import RegisterRequest, LoginRequest, CreateJobRequest, GetMapResp, PatchOpsReq
@@ -15,6 +15,7 @@ from Repositories.UserRepository import UserRepository
 from Repositories.JobRepository import JobRepository
 from Repositories.PromptRepository import PromptRepository
 from Repositories.ContactRepository import ContactRepository
+from Repositories.EmailRepository import EmailRepository
 from FileManager.FileManager import FileManager
 from Core.core import Core
 from shared.StorageRef import StorageMode
@@ -24,32 +25,42 @@ log = get_logger(__name__)
 
 router = APIRouter()
 
-# Dependency factory
-# def get_user_repo():
-#     return UserRepository()
+def get_user_service(request: Request) -> UserService:
+    return UserService(request.app.state.user_repo)
 
-# def get_job_repo():
-#     return JobRepository()
+def get_contacts_service(request: Request):
+    return request.app.state.contact_svc  # already built in main.py
 
-def get_user_service():
-    user_repo = UserRepository()
-    return UserService(user_repo)
+def get_job_service(request: Request) -> JobService:
+    return JobService(
+        request.app.state.job_repo,
+        request.app.state.contact_repo,
+        request.app.state.file_manager,
+        request.app.state.core,
+        request.app.state.prompt_svc,
+        request.app.state.schema_svc,
+        email_repo=request.app.state.email_repo,  # when you add it
+    )
 
-def get_contacts_service():
-    contacts_repo = ContactRepository()
-    return ContactService(contacts_repo)
+# def get_user_service():
+#     user_repo = UserRepository()
+#     return UserService(user_repo)
+
+# def get_contacts_service():
+#     contacts_repo = ContactRepository()
+#     return ContactService(contacts_repo)
 
 
-def get_job_service():
-    prompt_rep = PromptRepository()
-    contacts_repo = ContactRepository()
-    prompt_service = PromptService(prompt_rep)
-    schema_service = SchemaService()
-    contacts_service = get_contacts_service()
-    job_repo = JobRepository()
-    file_manager = FileManager(mode=StorageMode.LOCAL)
-    core = Core(file_manager, contacts_service)
-    return JobService(job_repo, contacts_repo, file_manager, core, prompt_service, schema_service)
+# def get_job_service():
+#     prompt_rep = PromptRepository()
+#     contacts_repo = ContactRepository()
+#     prompt_service = PromptService(prompt_rep)
+#     schema_service = SchemaService()
+#     contacts_service = get_contacts_service()
+#     job_repo = JobRepository()
+#     file_manager = FileManager(mode=StorageMode.LOCAL)
+#     core = Core(file_manager, contacts_service)
+#     return JobService(job_repo, contacts_repo, file_manager, core, prompt_service, schema_service)
 
 # Handlers
 
@@ -203,7 +214,17 @@ async def patch_contacts_map(
         log.error("Unexpected error patching contacts map", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
     
-    #return job_service.apply_contacts_map_ops(user_id, job_id, body.base_ref, body.ops)
+   
+@router.post("/generate_emails/{job_id}")
+async def generate_emails(job_id: str, authorization: str = Header(...), job_service: JobService = Depends(get_job_service)):
+    try:
+        user_id = get_user_id_from_header(authorization)
+        res = job_service.generate_emails(user_id, job_id)
+        log.info(f"user_id: {user_id}, job_id: {job_id}")
+        return res # TODO
+    except Exception as e:
+        log.error("Unexpected error generating emails", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 

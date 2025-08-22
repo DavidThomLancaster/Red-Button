@@ -1,5 +1,6 @@
 from Repositories.JobRepository import JobRepository
 from Repositories.ContactRepository import ContactRepository
+from Repositories.EmailRepository import EmailRepository
 from FileManager import FileManager  # adjust import path if needed
 from fastapi import HTTPException, status
 from starlette import status as http_status
@@ -16,13 +17,14 @@ from datetime import datetime
 log = get_logger(__name__)
 
 class JobService:
-    def __init__(self, job_repo: JobRepository, contacts_repo: ContactRepository, file_manager: FileManager, core, prompt_service: PromptService, schema_service: SchemaService):
+    def __init__(self, job_repo: JobRepository, contacts_repo: ContactRepository, file_manager: FileManager, core, prompt_service: PromptService, schema_service: SchemaService, email_repo: EmailRepository):
         self.job_repo = job_repo
         self.contacts_repo = contacts_repo
         self.file_manager = file_manager
         self.core = core
         self.prompt_service = prompt_service
         self.schema_service = schema_service
+        self.email_repo = email_repo
 
     def create_job(self, user_id: str, job_name: str, notes: str) -> str:
         try:
@@ -119,19 +121,35 @@ class JobService:
         # normalize separators + trim
         return s.replace("\\", "/").strip()
 
-
     def apply_contacts_map_ops(self, user_id: str, job_id: str, base_ref: str, ops: list) -> dict:
         self._assert_owner(user_id, job_id)
 
-        # Compare refs in a platform-agnostic way
+        # Get the current ref (prefer contacts_map; fall back to jsons if you keep that)
         current_ref_raw = self.job_repo.get_contacts_map_ref(job_id) or self.job_repo.get_jsons_ref(job_id)
-        current_ref = self._canon_ref(current_ref_raw or "")
-        base_ref = self._canon_ref(base_ref or "")
 
-        if not current_ref or current_ref != base_ref:
+        if not current_ref_raw:
+            raise HTTPException(http_status.HTTP_409_CONFLICT, "No contacts map available for this job")
+
+        # Handle both StorageRef and plain string
+        if isinstance(current_ref_raw, StorageRef):
+            current_ref_path = current_ref_raw.location
+            current_ref_for_loader = current_ref_raw
+        else:
+            # Assume local if you only have a path string; adjust if get_jsons_ref returns a mode too
+            current_ref_path = str(current_ref_raw)
+            current_ref_for_loader = StorageRef(location=current_ref_path, mode=StorageMode.LOCAL)
+
+        # Canonicalize/compare with the client-provided base_ref to enforce optimistic concurrency
+        current_ref = self._canon_ref(current_ref_path or "")
+        base_ref_canon = self._canon_ref(base_ref or "")
+
+        if not current_ref or current_ref != base_ref_canon:
             raise HTTPException(http_status.HTTP_409_CONFLICT, "Map changed; refresh and try again")
 
-        # Normalize ops to dicts (supports Pydantic models)
+        # Load the current full document (including "metadata")
+        cmap = self.file_manager.load_json(current_ref_for_loader)
+
+        # Normalize ops to dicts
         norm_ops = []
         for op in ops:
             if hasattr(op, "model_dump"):
@@ -143,18 +161,17 @@ class JobService:
             else:
                 raise HTTPException(http_status.HTTP_422_UNPROCESSABLE_ENTITY, f"Unsupported op type: {type(op).__name__}")
 
-        # Load current map (full doc, may include "metadata")
-        cmap = self.file_manager.load_json(StorageRef(location=current_ref_raw, mode=StorageMode.LOCAL))
-
         # Apply ops
         for op in norm_ops:
-            trade = op["trade"]; idx = op["block"]; cid = str(op["contact_id"])
+            trade = op["trade"]
+            idx = op["block"]
+            cid = str(op["contact_id"])
+
             blocks = cmap.get(trade, [])
             if not isinstance(blocks, list) or idx < 0 or idx >= len(blocks):
                 raise HTTPException(http_status.HTTP_400_BAD_REQUEST, f"Invalid block index for trade '{trade}'")
 
             block = blocks[idx] if isinstance(blocks[idx], dict) else {}
-            # ensure the block has a contacts list we can mutate
             contacts = block.setdefault("contacts", [])
             if not isinstance(contacts, list):
                 contacts = block["contacts"] = [str(contacts)]
@@ -167,16 +184,15 @@ class JobService:
             else:
                 raise HTTPException(http_status.HTTP_400_BAD_REQUEST, f"Unknown op '{op['op']}'")
 
-            # write back block in case it was not a dict originally
             blocks[idx] = block
             cmap[trade] = blocks
 
         # Save new version (keep entire doc, including metadata)
         fname = f"contacts_map_{datetime.utcnow().isoformat().replace(':','-')}.json"
-        new_ref = self.file_manager.save_json_as(user_id, job_id, cmap, fname)
+        new_ref = self.file_manager.save_json_as(user_id, job_id, cmap, fname)  # returns StorageRef
         self.job_repo.update_status_contacts_map(job_id, new_ref)
 
-        # Clean response map: only trades with list blocks (strip metadata/strays)
+        # Clean response map: only trades with list blocks (strip metadata)
         cleaned_map = {k: v for k, v in cmap.items() if k != "metadata" and isinstance(v, list)}
 
         # Resolve contacts for FE convenience
@@ -188,40 +204,109 @@ class JobService:
             "ref": Path(new_ref.location).as_posix(),
             "map": cleaned_map,
             "contactsById": contacts,
-            # optionally also return "metadata": cmap.get("metadata"),
+            # "metadata": cmap.get("metadata"),  # include if the FE wants it
         }
 
-    # def apply_contacts_map_ops(self, user_id: str, job_id: str, base_ref: str, ops: list[dict]) -> dict:
+    
+    # def apply_contacts_map_ops(self, user_id: str, job_id: str, base_ref: str, ops: list) -> dict:
     #     self._assert_owner(user_id, job_id)
-    #     current_ref = self.job_repo.get_contacts_map_ref(job_id) or self.job_repo.get_jsons_ref(job_id)
-    #     current_ref  = self._canon_ref(current_ref or "")
+
+    #     # Compare refs in a platform-agnostic way
+    #     current_ref_raw = self.job_repo.get_contacts_map_ref(job_id) or self.job_repo.get_jsons_ref(job_id)
+    #     current_ref = self._canon_ref(current_ref_raw.location or "")
     #     base_ref = self._canon_ref(base_ref or "")
 
-    #     print("\n\ncur_norm:", current_ref, "\nbase_norm:", base_ref, "\n\n")
     #     if not current_ref or current_ref != base_ref:
     #         raise HTTPException(http_status.HTTP_409_CONFLICT, "Map changed; refresh and try again")
-    #     print("\n\n You should see this text if exception not raised\n\n")
-    #     cmap = self.file_manager.load_json(StorageRef(location=current_ref, mode=StorageMode.LOCAL))  # adapt
+
+    #     # Normalize ops to dicts (supports Pydantic models)
+    #     norm_ops = []
     #     for op in ops:
-    #         trade = op.trade; idx = op.block; cid = op.contact_id
+    #         if hasattr(op, "model_dump"):
+    #             norm_ops.append(op.model_dump())
+    #         elif hasattr(op, "dict"):
+    #             norm_ops.append(op.dict())
+    #         elif isinstance(op, dict):
+    #             norm_ops.append(op)
+    #         else:
+    #             raise HTTPException(http_status.HTTP_422_UNPROCESSABLE_ENTITY, f"Unsupported op type: {type(op).__name__}")
+
+    #     # Load current map (full doc, may include "metadata")
+    #     ! #change so that you're loading from the ref and we don't have to mess with it
+    #     cmap = self.file_manager.load_json(current_ref_raw)#StorageRef(location=current_ref_raw, mode=StorageMode.LOCAL))
+
+    #     # Apply ops
+    #     for op in norm_ops:
+    #         trade = op["trade"]; idx = op["block"]; cid = str(op["contact_id"])
     #         blocks = cmap.get(trade, [])
-    #         if idx < 0 or idx >= len(blocks):
+    #         if not isinstance(blocks, list) or idx < 0 or idx >= len(blocks):
     #             raise HTTPException(http_status.HTTP_400_BAD_REQUEST, f"Invalid block index for trade '{trade}'")
-    #         contacts = blocks[idx].get("contacts", [])
-    #         if op.op == "add_contact":
+
+    #         block = blocks[idx] if isinstance(blocks[idx], dict) else {}
+    #         # ensure the block has a contacts list we can mutate
+    #         contacts = block.setdefault("contacts", [])
+    #         if not isinstance(contacts, list):
+    #             contacts = block["contacts"] = [str(contacts)]
+
+    #         if op["op"] == "add_contact":
     #             if cid not in contacts:
     #                 contacts.append(cid)
-    #         elif op.op == "remove_contact":
-    #             contacts[:] = [x for x in contacts if x != cid]
+    #         elif op["op"] == "remove_contact":
+    #             block["contacts"] = [x for x in contacts if str(x) != cid]
+    #         else:
+    #             raise HTTPException(http_status.HTTP_400_BAD_REQUEST, f"Unknown op '{op['op']}'")
 
-    #     # Save new version
+    #         # write back block in case it was not a dict originally
+    #         blocks[idx] = block
+    #         cmap[trade] = blocks
+
+    #     # Save new version (keep entire doc, including metadata)
     #     fname = f"contacts_map_{datetime.utcnow().isoformat().replace(':','-')}.json"
-    #     new_ref = self.file_manager.save_json_as(user_id, job_id, cmap, fname) # TODO - Needs to be save json as...
-    #     self.job_repo.update_status_contacts_map(job_id, new_ref) 
-    #     # Respond with resolved contacts so UI can update names immediately
-    #     ids = self._collect_contact_ids(cmap)
+    #     new_ref = self.file_manager.save_json_as(user_id, job_id, cmap, fname)
+    #     self.job_repo.update_status_contacts_map(job_id, new_ref)
+
+    #     # Clean response map: only trades with list blocks (strip metadata/strays)
+    #     cleaned_map = {k: v for k, v in cmap.items() if k != "metadata" and isinstance(v, list)}
+
+    #     # Resolve contacts for FE convenience
+    #     ids = self._collect_contact_ids(cleaned_map)
     #     contacts = self._resolve_contacts(ids)
-    #     return {"status": "UPDATED", "ref": new_ref.location, "map": cmap, "contactsById": contacts}
+
+    #     return {
+    #         "status": "UPDATED",
+    #         "ref": Path(new_ref.location).as_posix(),
+    #         "map": cleaned_map,
+    #         "contactsById": contacts,
+    #         # optionally also return "metadata": cmap.get("metadata"),
+    #     }
+    
+    # TODO - finish implementing me
+    def generate_emails(self, user_id: str, job_id: str):
+        self._assert_owner(user_id, job_id)
+        log.info(f"user_id: {user_id}, job_id: {job_id}")
+
+        contacts_map_ref = self.job_repo.get_contacts_map_ref(job_id)
+        if not contacts_map_ref:
+            raise ValueError("No contacts_map set for this job")
+        
+        #contacts_map_ref = StorageRef(location=contacts_map_ref_loc, mode=self.file_manager.default_mode if hasattr(self.file_manager, "default_mode") else StorageMode.LOCAL)
+
+        template = self.file_manager.get_email_template("v1")
+
+        log.info(template)
+        log.info(job_id)
+        log.info(contacts_map_ref)
+
+        #return "x" def generate_emails(self, job_id: str, template: dict, email_repo, contacts_map_ref):
+        result = self.core.generate_emails(
+            job_id=job_id,
+            template=template,
+            email_repo=self.email_repo,
+            contacts_map_ref=contacts_map_ref,    # provenance
+        )
+        return result
+        
+
 
     # TODO complete this...
     def submit_pdf(self, user_id: str, job_id: str, pdf_file: bytes, safe_name):

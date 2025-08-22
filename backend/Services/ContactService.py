@@ -7,7 +7,7 @@ class ContactService:
     def __init__(self, contact_repository: ContactRepository):
         self.contact_repo = contact_repository
 
-    # TODO...
+    
     def get_contact_ids_for_trade(self, trade_canonical: str, limit: int | None = None) -> List[str]:
         """
         Return a list of contact IDs that match a canonical trade name.

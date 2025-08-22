@@ -303,6 +303,39 @@ class FileManager:
             return data
 
         raise ValueError(f"Unsupported storage mode for load_json: {mode}")
+    
+    #def get_contacts_map_from_ref
+    
+    # This is hardcoded for now, but this will probably need to be changed in the future TODO
+    def get_email_template(self, version: str = "v1") -> dict:
+        """
+        Temporary, hardcoded email template.
+        Later you can load this from disk/S3 via StorageRef.
+        """
+        return {
+            "version": version,
+            # Base template; fields you can use: {name}, {trade}, {pages}, {notes}
+            "subject": "Bid request for {trade}",
+            "body": (
+                "Hi {name},\n\n"
+                "We're requesting a bid for {trade}.\n"
+                "Relevant pages: {pages}\n"
+                "{notes}\n\n"
+                "Thanks,\nRed Button"
+            ),
+            # Optional per-trade overrides
+            "overrides": {
+                "Plumbing": {
+                    "subject": "Plumbing bid request",
+                    "body": (
+                        "Hi {name},\n\n"
+                        "We have plumbing scope on pages {pages}.\n"
+                        "{notes}\n\n"
+                        "Thanks,\nRed Button"
+                    )
+                }
+            }
+        }
 
 
     # def load_json(self, ref: StorageRef) -> dict:

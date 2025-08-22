@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { getJobAPI, submitPdfAPI } from "../api/jobs";
+import { getJobAPI, submitPdfAPI, generateEmailsApi } from "../api/jobs";
 import type { GetJobResponse } from "../types";
 
 // 👇 import your panel (adjust the path if needed)
@@ -79,6 +79,18 @@ const SingleJob: React.FC = () => {
     }
   }
 
+  async function generateEmails() {
+    if (!token) return;
+    try {
+      const res: any = await generateEmailsApi(token, jobId);
+      // TODO - I'll probably have to do more then just print the res later
+      console.log(res)
+    } catch (e: any) {
+      if (e?.status === 401) logout();
+      else setErr(e?.message || "Generate emails failed");
+    }
+  }
+
   if (loading) return <p style={{ padding: 16 }}>Loading…</p>;
   if (err) return <p style={{ padding: 16, color: "crimson" }}>{err}</p>;
   if (!data) return <p style={{ padding: 16 }}>Not found.</p>;
@@ -114,6 +126,10 @@ const SingleJob: React.FC = () => {
           <button onClick={() => setMapRefreshKey(k => k + 1)} disabled={uploading}>
             Refresh Contact Map
           </button>
+          <button onClick={() => generateEmails()} disabled={uploading}>
+            Generate Emails
+          </button>
+
         </div>
       </section>
 
