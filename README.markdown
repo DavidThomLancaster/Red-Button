@@ -53,16 +53,19 @@ python -m venv .venv
 # install dependencies
 pip install -r requirements.txt
 
-# copy example env and set your own values
-cp .env.example .env
+# Make a .env file in your root with this in it:
+OPEN_API_KEY=your-openai-api-key
 
 # run server
-uvicorn backend.main:app --reload --port 8001
+python main.py
 
 ```
 ### Frontend
 
 ```bash
+# in the frontend, you need a .env file with this in it
+VITE_API_BASE=http://localhost:8001
+
 cd frontend
 npm install
 npm run dev
@@ -77,7 +80,6 @@ Copy .env.example → .env and fill in your values:
 ```bash
 # Backend
 OPENAI_API_KEY=your-openai-api-key
-OPENAI_MODEL=gpt-4o
 
 # Frontend
 VITE_API_BASE_URL=http://localhost:8001
