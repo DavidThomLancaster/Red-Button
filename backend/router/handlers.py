@@ -228,7 +228,6 @@ async def generate_emails(job_id: str, authorization: str = Header(...), job_ser
 
 
 
-<<<<<<< HEAD
 
 # @router.post("/create_job")
 # async def create_job(request: CreateJobRequest, authorization: str = Header(...)): 
@@ -303,5 +302,3 @@ async def generate_emails(job_id: str, authorization: str = Header(...), job_ser
 #                             detail="Internal server error")
 
 # FOR TESTING PURPOSES - Can we push this to github?
-=======
->>>>>>> 456426c... Frontend now adds contacts for job sections. It will add whatever ID you give it. It's currently set to "FAKEID"
