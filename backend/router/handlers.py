@@ -228,3 +228,75 @@ async def generate_emails(job_id: str, authorization: str = Header(...), job_ser
 
 
 
+
+# @router.post("/create_job")
+# async def create_job(request: CreateJobRequest, authorization: str = Header(...)): 
+#     try:
+#         # 1. Extract token from header
+#         if not authorization.startswith("Bearer "):
+#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+#                                 detail="Invalid authorization header format")
+#         token = authorization.split(" ")[1]
+
+#         # 2. Validate & decode
+#         payload = TokenService.validate_token(token)
+#         if not payload:
+#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+#                                 detail="Invalid or expired token")
+
+#         log.info("Token was validated!", extra={"nope": 1})
+
+#         # 3. Extract user_id
+#         user_id = payload.get("user_id")
+#         if not user_id:
+#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+#                                 detail="Token missing user_id")
+
+#         # 4. Create the job
+#         job_id = JobService.create_job(user_id, request.name, request.notes)
+
+#         log.info("Job created", extra={"user_id": user_id, "job_id": job_id})
+#         return {"message": "Job created successfully", "job_id": job_id}
+
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         log.error("Unexpected error creating job", exc_info=True, extra={"request": request.dict()})
+#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                             detail="Internal server error")
+
+# @router.get("/get_job")
+# async def get_job(authorization: str = Header(...)):
+#     try:
+#         # 1. Extract token from header
+#         if not authorization.startswith("Bearer "):
+#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+#                                 detail="Invalid authorization header format")
+#         token = authorization.split(" ")[1]
+
+#         # 2. Validate & decode
+#         payload = TokenService.validate_token(token)
+#         if not payload:
+#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+#                                 detail="Invalid or expired token")
+
+#         log.info("Token was validated!", extra={"endpoint": "get_job"})
+
+#         # 3. Extract user_id (using "sub" if that’s how you set it)
+#         user_id = payload.get("user_id")
+#         if not user_id:
+#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+#                                 detail="Token missing user_id")
+
+#         # 4. Get jobs for this user
+#         jobs = JobService.get_jobs(user_id)
+
+#         log.info("Jobs retrieved", extra={"user_id": user_id, "job_count": len(jobs)})
+#         return {"jobs": jobs}
+
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         log.error("Unexpected error retrieving jobs", exc_info=True, extra={"authorization": authorization})
+#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                             detail="Internal server error")

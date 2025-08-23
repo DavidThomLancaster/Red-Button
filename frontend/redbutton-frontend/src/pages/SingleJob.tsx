@@ -4,7 +4,6 @@ import { useAuth } from "../auth/AuthContext";
 import { getJobAPI, submitPdfAPI, generateEmailsApi } from "../api/jobs";
 import type { GetJobResponse } from "../types";
 
-
 // 👇 import your panel (adjust the path if needed)
 import { ContactMapPanel } from "../components/ContactMapPanel";
 
@@ -18,8 +17,6 @@ const SingleJob: React.FC = () => {
 
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-
-  // Maybe do this?
 
   // keep the most recent POST /submit_pdf response here
   const [lastResponse, setLastResponse] = useState<any | null>(null);
@@ -140,7 +137,14 @@ const SingleJob: React.FC = () => {
       <section style={{ marginTop: 24 }}>
         <h3>Contact Map</h3>
         <div style={{ border: "1px solid #e6e6e6", borderRadius: 8, padding: 12, background: "#fafafa" }}>
-          <ContactMapPanel key={`cmp:${jobId}:${mapRefreshKey}`} jobId={jobId} />
+          <ContactMapPanel
+            key={`cmp:${jobId}:${mapRefreshKey}`} // remount to refetch
+            jobId={jobId}
+            onNeedAddContact={(trade, blockIdx) => {
+              // TODO: open your Contact Picker modal here
+              console.log("Add contact requested for", trade, "block", blockIdx);
+            }}
+          />
         </div>
       </section>
 
