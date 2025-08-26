@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Header, Depends, UploadFil
 from Services.UserService import UserService
 from Utils.AuthUtils import hash_password, get_user_id_from_header
 from models.user_models import RegisterRequest, LoginRequest, CreateJobRequest, GetMapResp, PatchOpsReq
+from models.contact_models import ContactSearchRequest
 from Utils.logger import get_logger
 from Services.AuthService import AuthService
 from Services.TokenService import TokenService
@@ -19,6 +20,7 @@ from Repositories.EmailRepository import EmailRepository
 from FileManager.FileManager import FileManager
 from Core.core import Core
 from shared.StorageRef import StorageMode
+from shared.ParamsDTO import ParamsDTO
 
 log = get_logger(__name__)
 
@@ -226,7 +228,37 @@ async def generate_emails(job_id: str, authorization: str = Header(...), job_ser
         log.error("Unexpected error generating emails", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
+# TODO Slice 7 - handler for getting contacts FIXME 
+# FIXME - define request model for filters and pagination 
+# wrap the parameters in an object probably.
+@router.post("/jobs/{job_id}/contacts/search")
+async def search_contacts(job_id: str, 
+                          req: ContactSearchRequest, 
+                          authorization: str = Header(...), 
+                          contacts_service: ContactService = Depends(get_contacts_service),
+                          job_service: JobService = Depends(get_job_service)):
+    # Access filters like req.filters.trade, req.filters.q
+    # Access pagination like req.page, req.page_size
+    print("Reached the handler")
+    print(req)
+    try:
+        user_id = get_user_id_from_header(authorization)
+        params = ParamsDTO(
+            trade=req.trade,
+            name=req.name,
+            service_area=req.service_area,
+            limit=req.limit,
+            page=req.page
+        )
+        result = contacts_service.get_contacts_by_parameters(params)
+        return result
+    except HTTPException:
+        raise
+    except Exception:
+        log.error("Unexpected error searching contacts", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
+    
 
 
 # @router.post("/create_job")

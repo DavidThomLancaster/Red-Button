@@ -1,5 +1,6 @@
 import sqlite3
 from typing import List, Dict
+from shared.ParamsDTO import ParamsDTO
 
 class ContactRepository:
     """
@@ -66,7 +67,7 @@ class ContactRepository:
         for start in range(0, len(unique_ids), PARAM_LIMIT):
             batch = unique_ids[start:start + PARAM_LIMIT]
             placeholders = ",".join("?" for _ in batch)
-            sql = f"""
+            sql = f""" 
                 SELECT id, name, email, phone, service_area
                 FROM contacts
                 WHERE id IN ({placeholders})
@@ -78,6 +79,38 @@ class ContactRepository:
 
         # preserve original order; drop missing
         return [results_by_id[cid] for cid in unique_ids if cid in results_by_id]
+    
+    # TODO Slice 7 - get list of contacts by parameters (trade, service area, etc.)
+    
+    def find_contacts_by_parameters(self, params_dto: ParamsDTO) -> List[dict]:
+        sql = [
+            "SELECT DISTINCT c.id, c.name, c.email, c.phone, c.service_area",
+            "FROM contacts c",
+            "LEFT JOIN contact_trades ct ON c.id = ct.contact_id",
+            "WHERE 1=1"
+        ]
+        query_params = []
+
+        # Apply filters if present
+        if params_dto.trade:
+            sql.append("AND LOWER(ct.trade) = LOWER(?)")
+            query_params.append(params_dto.trade)
+
+        if params_dto.service_area:
+            sql.append("AND LOWER(c.service_area) = LOWER(?)")
+            query_params.append(params_dto.service_area)
+
+        if params_dto.name:
+            sql.append("AND LOWER(c.name) LIKE LOWER(?)")
+            query_params.append(f"%{params_dto.name}%")
+
+        # Pagination
+        offset = (params_dto.page - 1) * params_dto.limit
+        sql.append("LIMIT ? OFFSET ?")
+        query_params.extend([params_dto.limit, offset])
+
+        rows = self.conn.execute("\n".join(sql), query_params).fetchall()
+        return [dict(r) for r in rows]
 
 
 

@@ -46,6 +46,7 @@ export const ContactMapPanel: React.FC<{ jobId: string }> = ({ jobId }) => {
     }
   }
 
+  // TODO - Modify this so that it calls a function to get the contacts first before it adds the contacts.
   async function addContact(trade: string, block: number) {
     if (!token) return;
     const contact_id = "FAKEID" //window.prompt("Enter contact ID to add:");

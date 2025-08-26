@@ -183,7 +183,7 @@ def test_generate_emails(core, email_repo, file_manager, contact_repo, temp_dir)
         template=template,
         email_repo=email_repo,
         contacts_map_ref=contacts_map_ref,
-        auto_fill_when_missing=False,   # we explicitly set contacts above
+        #auto_fill_when_missing=False,   # we explicitly set contacts above
     )
 
     # 5) Assertions on result and DB side-effects
