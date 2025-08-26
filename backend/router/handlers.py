@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Header, Depends, UploadFil
 from Services.UserService import UserService
 from Utils.AuthUtils import hash_password, get_user_id_from_header
 from models.user_models import RegisterRequest, LoginRequest, CreateJobRequest, GetMapResp, PatchOpsReq
-from models.contact_models import ContactSearchRequest
+from models.contact_models import ContactSearchRequest, ContactSearchResponse
 from Utils.logger import get_logger
 from Services.AuthService import AuthService
 from Services.TokenService import TokenService
@@ -231,7 +231,7 @@ async def generate_emails(job_id: str, authorization: str = Header(...), job_ser
 # TODO Slice 7 - handler for getting contacts FIXME 
 # FIXME - define request model for filters and pagination 
 # wrap the parameters in an object probably.
-@router.post("/jobs/{job_id}/contacts/search")
+@router.post("/jobs/{job_id}/contacts/search", response_model=ContactSearchResponse)
 async def search_contacts(job_id: str, 
                           req: ContactSearchRequest, 
                           authorization: str = Header(...), 
