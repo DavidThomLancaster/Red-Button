@@ -79,9 +79,11 @@ async def ping():
 @router.post("/register")
 async def register_user(request: RegisterRequest, user_service: UserService = Depends(get_user_service)):
     try:
-        user_id = user_service.register_user(request.email, request.password)
+        token = user_service.register_user(request.email, request.password)
         log.info("User registered successfully", extra={"user_email": request.email}) 
-        return {"message": "User created successfully", "user_id": user_id}
+        #log.info(f"User ID: {user_id}")
+        return {"access_token": token, "token_type": "bearer"}
+        #return {"message": "User created successfully", "user_id": user_id}
     except HTTPException as e:
         log.warning("User registration failed", extra={"user_email": request.email, "reason": e.detail})
         raise

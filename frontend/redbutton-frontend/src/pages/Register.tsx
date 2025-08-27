@@ -17,8 +17,9 @@ const Register: React.FC = () => {
     setErr(null);
     setLoading(true);
     try {
-      const { token } = await registerApi(email, password);
+      const  token  = await registerApi(email, password); // was { token}
       login(token);              // or redirect to /login if your backend doesn't return token
+      console.log(token)
       nav("/jobs");
     } catch (e: any) {
       setErr(e?.message || "Register failed");

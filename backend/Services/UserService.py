@@ -20,7 +20,8 @@ class UserService:
         if self.user_repo.find_by_email(email):
             raise HTTPException(status_code=400, detail="Email already registered")
         password_hashed = AuthUtils.hash_password(password)
-        return self.user_repo.create_user(email, password_hashed)
+        user_id =  self.user_repo.create_user(email, password_hashed)
+        return TokenService.create_token(user_id)
 
     def login(self, email: str, password: str) -> str:
         user = self.user_repo.find_by_email(email)
