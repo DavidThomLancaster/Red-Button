@@ -2,7 +2,8 @@
 from Repositories.ContactRepository import ContactRepository
 from typing import Dict, List
 import json
-from shared.ParamsDTO import ParamsDTO
+#from backend.shared.DTOs import ParamsDTO, ContactDTO
+from shared.DTOs import ParamsDTO, ContactDTO
 
 class ContactService:
     def __init__(self, contact_repository: ContactRepository):
@@ -25,4 +26,17 @@ class ContactService:
             "page": params_dto.page,
             "count": len(items),
         }
+    
+    def create_my_contact(self, user_id: str, body: dict) -> dict:
+        dto = ContactDTO(
+            user_id=user_id,
+            name=body["name"],
+            email=body.get("email"),
+            phone=body.get("phone"),
+            service_area=body.get("service_area"),
+            trades=body.get("trades") or [],
+        )
+        return self.contact_repo.create_personal_contact(dto)
+    
+
 

@@ -7,6 +7,7 @@ import CreateJob from "./pages/CreateJob";
 import RequireAuth from "./auth/RequireAuth";
 import NavBar from "./components/NavBar";
 import SingleJob from "./pages/SingleJob";
+import { ContactsPage } from "./pages/ContactsPage";
 
 const App: React.FC = () => {
   return (
@@ -33,7 +34,7 @@ const App: React.FC = () => {
             </RequireAuth>
           }
         />
-
+        <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/jobs/:jobId" element={<RequireAuth><SingleJob /></RequireAuth>} />
 
       

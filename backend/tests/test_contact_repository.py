@@ -1,6 +1,6 @@
 import pytest
 from Repositories.ContactRepository import ContactRepository
-from shared.ParamsDTO import ParamsDTO
+from backend.shared.DTOs import ParamsDTO
 import sqlite3
 
 @pytest.fixture()

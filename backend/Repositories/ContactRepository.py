@@ -1,6 +1,8 @@
 import sqlite3
 from typing import List, Dict
-from shared.ParamsDTO import ParamsDTO
+#from backend.shared.DTOs import ParamsDTO, ContactDTO
+from shared.DTOs import ParamsDTO, ContactDTO
+from uuid import uuid4
 
 class ContactRepository:
     """
@@ -23,7 +25,8 @@ class ContactRepository:
               name TEXT,
               email TEXT,
               phone TEXT,
-              service_area TEXT
+              service_area TEXT,
+              user_owner TEXT
             )
         """)
         self.conn.execute("""
@@ -79,38 +82,126 @@ class ContactRepository:
 
         # preserve original order; drop missing
         return [results_by_id[cid] for cid in unique_ids if cid in results_by_id]
+
+
+    def create_personal_contact(self, contact_dto: ContactDTO) -> Dict:
+        """
+        Insert a new personal (user-owned) contact.
+        - Ensures owner_user_id is set
+        - Deduplicates trades on insert
+        - Optionally enforces per-owner email uniqueness (soft check here)
+        Returns the inserted row as a dict.
+        """
+        if not contact_dto.user_id:
+            raise ValueError("user_id (owner) is required")
+
+        contact_id = contact_dto.id or str(uuid4())
+        email_norm = (contact_dto.email or "").strip()
+        email_lower = email_norm.lower()
+
+        # Optional uniqueness check per owner on email (skip if no email)
+        if email_lower:
+            exists = self.conn.execute(
+                """
+                SELECT 1
+                FROM contacts
+                WHERE owner_user_id = ? AND LOWER(COALESCE(email, '')) = ?
+                LIMIT 1
+                """,
+                (contact_dto.user_id, email_lower),
+            ).fetchone()
+            if exists:
+                raise ValueError("A contact with this email already exists for this user")
+
+        # Insert contact
+        self.conn.execute(
+            """
+            INSERT INTO contacts (id, name, email, phone, service_area, owner_user_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (contact_id, contact_dto.name, email_norm if email_norm else None, contact_dto.phone, contact_dto.service_area, contact_dto.user_id),
+        )
+
+        # Insert trades (if any), dedup + normalize case
+        trades = list(dict.fromkeys((contact_dto.trades or [])))  # dedup preserving order
+        if trades:
+            self.conn.executemany(
+                "INSERT INTO contact_trades (contact_id, trade) VALUES (?, ?)",
+                [(contact_id, t.strip()) for t in trades if t and t.strip()],
+            )
+
+        self.conn.commit()
+
+        row = self.conn.execute(
+            "SELECT id, name, email, phone, service_area FROM contacts WHERE id = ?",
+            (contact_id,),
+        ).fetchone()
+        return dict(row) if row else {"id": contact_id}
     
     # TODO Slice 7 - get list of contacts by parameters (trade, service area, etc.)
     
-    def find_contacts_by_parameters(self, params_dto: ParamsDTO) -> List[dict]:
+    def find_contacts_by_parameters(self, p: ParamsDTO) -> list[dict]:
         sql = [
             "SELECT DISTINCT c.id, c.name, c.email, c.phone, c.service_area",
             "FROM contacts c",
             "LEFT JOIN contact_trades ct ON c.id = ct.contact_id",
-            "WHERE 1=1"
+            "WHERE (c.owner_user_id = ? OR c.owner_user_id IS NULL)",
         ]
-        query_params = []
+        qp = [p.user_id]
 
-        # Apply filters if present
-        if params_dto.trade:
+        if p.trade:
             sql.append("AND LOWER(ct.trade) = LOWER(?)")
-            query_params.append(params_dto.trade)
+            qp.append(p.trade)
 
-        if params_dto.service_area:
+        if p.service_area:
             sql.append("AND LOWER(c.service_area) = LOWER(?)")
-            query_params.append(params_dto.service_area)
+            qp.append(p.service_area)
 
-        if params_dto.name:
+        if p.name:
             sql.append("AND LOWER(c.name) LIKE LOWER(?)")
-            query_params.append(f"%{params_dto.name}%")
+            qp.append(f"%{p.name}%")
 
-        # Pagination
-        offset = (params_dto.page - 1) * params_dto.limit
+        # nice to have: deterministic order
+        sql.append("ORDER BY c.name COLLATE NOCASE ASC")
+
+        # pagination
+        offset = (p.page - 1) * p.limit
         sql.append("LIMIT ? OFFSET ?")
-        query_params.extend([params_dto.limit, offset])
+        qp.extend([p.limit, offset])
 
-        rows = self.conn.execute("\n".join(sql), query_params).fetchall()
+        rows = self.conn.execute("\n".join(sql), qp).fetchall()
         return [dict(r) for r in rows]
+
+
+    # def find_contacts_by_parameters(self, params_dto: ParamsDTO) -> List[dict]:
+    #     sql = [
+    #         "SELECT DISTINCT c.id, c.name, c.email, c.phone, c.service_area",
+    #         "FROM contacts c",
+    #         "LEFT JOIN contact_trades ct ON c.id = ct.contact_id",
+    #         "WHERE 1=1"
+    #     ]
+    #     query_params = []
+
+    #     # Apply filters if present
+    #     if params_dto.trade:
+    #         sql.append("AND LOWER(ct.trade) = LOWER(?)")
+    #         query_params.append(params_dto.trade)
+
+    #     if params_dto.service_area:
+    #         sql.append("AND LOWER(c.service_area) = LOWER(?)")
+    #         query_params.append(params_dto.service_area)
+
+    #     if params_dto.name:
+    #         sql.append("AND LOWER(c.name) LIKE LOWER(?)")
+    #         query_params.append(f"%{params_dto.name}%")
+
+    #     # Pagination
+    #     offset = (params_dto.page - 1) * params_dto.limit
+    #     sql.append("LIMIT ? OFFSET ?")
+    #     query_params.extend([params_dto.limit, offset])
+
+    #     rows = self.conn.execute("\n".join(sql), query_params).fetchall()
+    #     return [dict(r) for r in rows]
 
 
 

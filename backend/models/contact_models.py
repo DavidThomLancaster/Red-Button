@@ -20,3 +20,11 @@ class ContactSearchResponse(BaseModel):
     limit: int
     page: int
     count: int  # number of items in this page (or total if you later add count_total)
+
+class CreateContactBody(BaseModel):
+    name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    service_area: Optional[str] = None
+    trades: Optional[List[str]] = None
+    id: Optional[str] = None  # optional; generated if not provided

@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Header, Depends, UploadFil
 from Services.UserService import UserService
 from Utils.AuthUtils import hash_password, get_user_id_from_header
 from models.user_models import RegisterRequest, LoginRequest, CreateJobRequest, GetMapResp, PatchOpsReq
-from models.contact_models import ContactSearchRequest, ContactSearchResponse
+from models.contact_models import ContactSearchRequest, ContactSearchResponse, CreateContactBody
 from Utils.logger import get_logger
 from Services.AuthService import AuthService
 from Services.TokenService import TokenService
@@ -20,7 +20,8 @@ from Repositories.EmailRepository import EmailRepository
 from FileManager.FileManager import FileManager
 from Core.core import Core
 from shared.StorageRef import StorageMode
-from shared.ParamsDTO import ParamsDTO
+#from backend.shared.DTOs import ParamsDTO
+from shared.DTOs import ContactDTO, ParamsDTO
 
 log = get_logger(__name__)
 
@@ -244,6 +245,7 @@ async def search_contacts(job_id: str,
     try:
         user_id = get_user_id_from_header(authorization)
         params = ParamsDTO(
+            user_id=user_id,
             trade=req.trade,
             name=req.name,
             service_area=req.service_area,
@@ -257,6 +259,14 @@ async def search_contacts(job_id: str,
     except Exception:
         log.error("Unexpected error searching contacts", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
+    
+@router.post("/my/contacts")
+def create_my_contact(req: CreateContactBody, authorization: str = Header(...), contacts_service: ContactService = Depends(get_contacts_service)):
+    user_id = get_user_id_from_header(authorization)
+    print(req)
+    return contacts_service.create_my_contact(user_id, req.model_dump())
+    #return "Not implemented yet"
+
 
     
 
