@@ -26,7 +26,7 @@ class ContactRepository:
               email TEXT,
               phone TEXT,
               service_area TEXT,
-              user_owner TEXT
+              user_owner_id TEXT
             )
         """)
         self.conn.execute("""
