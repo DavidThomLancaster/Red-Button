@@ -8,6 +8,7 @@ from pathlib import Path
 from shared.StorageRef import StorageRef, StorageMode
 from Services.PromptService import PromptService
 from Services.SchemaService import SchemaService
+from shared.DTOs import BatchWithEmailHeaders, EmailBatchRecord, EmailHeaderRecord
 import json
 from Utils.logger import get_logger
 import hashlib
@@ -230,8 +231,26 @@ class JobService:
             email_repo=self.email_repo,
             contacts_map_ref=contacts_map_ref,    # provenance
         )
-        return result
+        return result # returns the batch_id
         
+    # TODO Slice 8 - implement get_email_batches => BatchesWithEmailHeaders
+    def get_email_batches(self, user_id: str, job_id: str):
+        self._assert_owner(user_id, job_id)
+        #batches = "TODO" 
+        batches = self.email_repo.get_all_batches_for_job(job_id)  # List[EmailBatchRecord]
+        aggregates: List[BatchWithEmailHeaders] = []
+
+        for b in batches:
+            log.info(f"Batch ID: {b.id}, Created At: {b.created_at}")
+            batch_id = b.id
+            headers = self.email_repo.get_email_headers_from_batch(batch_id)  # List[EmailHeaderRecord]
+            for h in headers:
+                log.info(f"  Email ID: {h.id}, Contact: {h.contact_name} <{h.contact_email}>, Status: {h.status}, Last Updated: {h.last_updated}")      
+
+            aggregates.append(BatchWithEmailHeaders(batch=b, emails=headers))
+        
+
+        return aggregates  # List[BatchWithEmailHeaders]
 
 
     # TODO complete this...

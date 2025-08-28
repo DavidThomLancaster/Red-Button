@@ -50,3 +50,4 @@ app.db
 # Keys & misc
 *.pem
 *.key
+backend/app.db-wal

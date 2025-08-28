@@ -1,5 +1,7 @@
 import sqlite3, uuid
 from typing import List, Dict, Optional
+from shared.DTOs import EmailBatchRecord, EmailHeaderRecord, EmailStatus
+from datetime import datetime
 
 class EmailRepository:
     def __init__(self, conn: sqlite3.Connection):
@@ -95,3 +97,116 @@ class EmailRepository:
 
         self.conn.commit()
         return email_id
+    
+    # TODO Slice 8 - implement get_all_batches_for_job => List[EmailHeaderRecord]
+    def get_email_headers_from_batch(self, batch_id: str) -> List[EmailHeaderRecord]:
+        rows = self.conn.execute(
+            """
+            SELECT
+            q.id                           AS email_id,
+            q.batch_id                     AS batch_id,
+            q.job_id                       AS job_id,
+            q.contact_id                   AS contact_id,
+            COALESCE(c.name, '')           AS contact_name,
+            COALESCE(q.to_email, c.email, '') AS contact_email,
+            q.subject                      AS subject,
+            q.status                       AS status_raw,
+            COALESCE(q.sent_at, CURRENT_TIMESTAMP) AS last_updated
+            FROM email_queue q
+            LEFT JOIN contacts c ON c.id = q.contact_id
+            WHERE q.batch_id = ?
+            ORDER BY contact_name, contact_email
+            """,
+            (batch_id,),
+        ).fetchall()
+
+        status_map = {
+            "draft": EmailStatus.draft,
+            "ready": EmailStatus.ready,
+            "queued": EmailStatus.ready,
+            "sending": EmailStatus.ready,
+            "mock_sent": EmailStatus.mock_sent,
+            "sent": EmailStatus.mock_sent,
+            "failed": EmailStatus.failed,
+        }
+
+        headers: List[EmailHeaderRecord] = []
+        for r in rows:
+            # row unpacking by alias
+            email_id, batch_id, job_id, contact_id, contact_name, contact_email, subject, status_raw, lu_raw = r
+
+            # parse timestamp
+            if isinstance(lu_raw, str):
+                try:
+                    last_updated = datetime.fromisoformat(lu_raw)
+                except ValueError:
+                    try:
+                        last_updated = datetime.strptime(lu_raw.split('.')[0], "%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        last_updated = datetime.utcnow()
+            else:
+                last_updated = lu_raw or datetime.utcnow()
+
+            status = status_map.get(status_raw, EmailStatus.draft)
+
+            headers.append(
+                EmailHeaderRecord(
+                    id=email_id,
+                    batch_id=batch_id,
+                    job_id=job_id,
+                    contact_id=contact_id,
+                    contact_name=contact_name or contact_email or "",
+                    contact_email=contact_email or "",
+                    trade=None,   # you dropped c.trades from SELECT; fill in later if you need it
+                    subject=subject,
+                    status=status,
+                    last_updated=last_updated,
+                )
+            )
+        return headers
+    
+    # TODO Slice 8 - implement get_all_batches_for_job => List[EmailHeaderRecord]
+    def get_all_batches_for_job(self, job_id: str) -> List[EmailBatchRecord]:
+        """
+        Returns all batches for a job as domain objects.
+        Note: page_spec/page_count are None since the current table doesn't store them.
+        """
+        rows = self.conn.execute(
+            """
+            SELECT
+              batch_id,
+              job_id,
+              template_version,
+              created_at
+            FROM email_batches
+            WHERE job_id = ?
+            ORDER BY datetime(created_at) DESC
+            """,
+            (job_id,),
+        ).fetchall()
+
+        batches: List[EmailBatchRecord] = []
+        for r in rows:
+            created_raw = r[3]
+            if isinstance(created_raw, str):
+                try:
+                    created_at = datetime.fromisoformat(created_raw)
+                except ValueError:
+                    try:
+                        created_at = datetime.strptime(created_raw.split('.')[0], "%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        created_at = datetime.utcnow()
+            else:
+                created_at = created_raw or datetime.utcnow()
+
+            batches.append(
+                EmailBatchRecord(
+                    id=r[0],  # map batch_id -> id
+                    job_id=r[1],
+                    template_version=r[2],
+                    created_at=created_at,
+                    page_spec=None,
+                    page_count=None,
+                )
+            )
+        return batches

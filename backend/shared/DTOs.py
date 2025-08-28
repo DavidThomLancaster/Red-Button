@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, List
+from enum import Enum
+from datetime import datetime
 
 @dataclass
 class ParamsDTO:
@@ -19,3 +21,36 @@ class ContactDTO:
     service_area: Optional[str] = None
     trades: Optional[List[str]] = None
     id: Optional[str] = None          # optional; generated if not provided
+
+class EmailStatus(str, Enum):
+    draft = "draft"
+    ready = "ready"
+    mock_sent = "mock_sent"
+    failed = "failed"
+
+@dataclass(frozen=True)
+class EmailBatchRecord:
+    id: str
+    job_id: str
+    template_version: str
+    created_at: datetime
+    page_spec: Optional[str] = None
+    page_count: Optional[int] = None
+
+@dataclass(frozen=True)
+class EmailHeaderRecord:
+    id: str
+    batch_id: str
+    job_id: str
+    contact_id: str
+    contact_name: str
+    contact_email: str
+    trade: Optional[str]
+    subject: str
+    status: EmailStatus
+    last_updated: datetime
+
+@dataclass(frozen=True)
+class BatchWithEmailHeaders:   # domain aggregate
+    batch: EmailBatchRecord
+    emails: List[EmailHeaderRecord]

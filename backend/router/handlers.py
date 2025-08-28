@@ -3,6 +3,7 @@ from Services.UserService import UserService
 from Utils.AuthUtils import hash_password, get_user_id_from_header
 from models.user_models import RegisterRequest, LoginRequest, CreateJobRequest, GetMapResp, PatchOpsReq
 from models.contact_models import ContactSearchRequest, ContactSearchResponse, CreateContactBody
+from models.email_batch_models import JobEmailBatchesDTO, BatchWithHeadersDTO, EmailBatchDTO, EmailHeaderDTO
 from Utils.logger import get_logger
 from Services.AuthService import AuthService
 from Services.TokenService import TokenService
@@ -22,6 +23,8 @@ from Core.core import Core
 from shared.StorageRef import StorageMode
 #from backend.shared.DTOs import ParamsDTO
 from shared.DTOs import ContactDTO, ParamsDTO
+
+from typing import List
 
 log = get_logger(__name__)
 
@@ -226,7 +229,7 @@ async def generate_emails(job_id: str, authorization: str = Header(...), job_ser
         user_id = get_user_id_from_header(authorization)
         res = job_service.generate_emails(user_id, job_id)
         log.info(f"user_id: {user_id}, job_id: {job_id}")
-        return res # TODO
+        return res # This is the batch_id sent back to the client
     except Exception as e:
         log.error("Unexpected error generating emails", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -269,6 +272,33 @@ def create_my_contact(req: CreateContactBody, authorization: str = Header(...), 
     return contacts_service.create_my_contact(user_id, req.model_dump())
     #return "Not implemented yet"
 
+# TODO Slice 8 - handler for /get_batches_and_headers {token, job_id} => BatchesWithEmailHeadersResponse
+@router.get("/jobs/{job_id}/email_batches", response_model=JobEmailBatchesDTO)
+async def get_batches_and_headers(
+    job_id: str,
+    authorization: str = Header(...),
+    job_service: JobService = Depends(get_job_service)
+):
+    print("Reached the get_batches_and_headers handler")
+    #return {"status": "ok"}
+    try:
+        user_id = get_user_id_from_header(authorization)
+        aggregates = job_service.get_email_batches(user_id, job_id)  # List[BatchWithEmailHeaders]
+
+        # Convert to DTOs for response
+        batches_dto: List[BatchWithHeadersDTO] = []
+        for agg in aggregates:
+            batch_dto = EmailBatchDTO.from_orm(agg.batch)
+            emails_dto = [EmailHeaderDTO.from_orm(e) for e in agg.emails]
+            batches_dto.append(BatchWithHeadersDTO(batch=batch_dto, emails=emails_dto))
+
+        return JobEmailBatchesDTO(job_id=job_id, batches=batches_dto)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Unexpected error retrieving email batches and headers", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     
 
