@@ -8,7 +8,7 @@ from pathlib import Path
 from shared.StorageRef import StorageRef, StorageMode
 from Services.PromptService import PromptService
 from Services.SchemaService import SchemaService
-from shared.DTOs import BatchWithEmailHeaders, EmailBatchRecord, EmailHeaderRecord
+from shared.DTOs import BatchWithEmailHeaders, EmailBatchRecord, EmailHeaderRecord, EmailDetailsRecord
 import json
 from Utils.logger import get_logger
 import hashlib
@@ -251,6 +251,63 @@ class JobService:
         
 
         return aggregates  # List[BatchWithEmailHeaders]
+    
+    def delete_email(self, user_id: str, job_id: str, email_id: str):
+        self._assert_owner(user_id, job_id)
+        ok = self.email_repo.delete_email_by_id(email_id)
+        if not ok:
+            raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete email")
+        return {"status": "DELETED", "email_id": email_id}
+    
+    #delete_email_batch(user_id, job_id, batch_id)
+
+    def delete_email_batch(self, user_id: str, job_id: str, batch_id: str):
+        self._assert_owner(user_id, job_id)
+        ok = self.email_repo.delete_email_batch_by_id(batch_id)
+        if not ok:
+            raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete email batch")
+        return {"status": "DELETED", "batch_id": batch_id}
+    
+    #job_service.get_email_details(user_id, job_id, email_id)
+    def get_email_details(self, user_id: str, job_id: str, email_id: str) -> EmailDetailsRecord:
+        self._assert_owner(user_id, job_id)
+        details = self.email_repo.get_email_details_by_id(email_id)
+        if not details:
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="Email not found")
+        return details
+    
+    # rec = job_service.update_email(
+    #         user_id, job_id, email_id,
+    #         subject=update.subject,
+    #         body=update.body,
+    #         to_email=update.to_email,
+    #         status=update.status,
+    #     )
+
+    def update_email(
+        self,
+        user_id: str,
+        job_id: str,
+        email_id: str,
+        *,
+        subject: Optional[str] = None,
+        body: Optional[str] = None,
+        to_email: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> Optional[EmailDetailsRecord]:
+        self._assert_owner(user_id, job_id)
+
+        # Optional: business rules. Example: prevent setting status=ready if subject/body empty
+        if status == "ready":
+            if subject is not None and not subject.strip():
+                raise ValueError("subject cannot be empty when marking ready")
+            if body is not None and not body.strip():
+                raise ValueError("body cannot be empty when marking ready")
+
+        rec = self.email_repo.update_email_fields(
+            job_id, email_id, subject=subject, body=body, to_email=to_email, status=status
+        )
+        return rec
 
 
     # TODO complete this...

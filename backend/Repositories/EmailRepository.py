@@ -1,6 +1,6 @@
 import sqlite3, uuid
 from typing import List, Dict, Optional
-from shared.DTOs import EmailBatchRecord, EmailHeaderRecord, EmailStatus
+from shared.DTOs import EmailBatchRecord, EmailHeaderRecord, EmailStatus, EmailDetailsRecord
 from datetime import datetime
 
 class EmailRepository:
@@ -210,3 +210,197 @@ class EmailRepository:
                 )
             )
         return batches
+    
+    def delete_email_by_id(self, email_id: str) -> bool:
+        """
+        Delete an email by its ID.
+        Returns True if a row was deleted, False otherwise.
+        """
+        cur = self.conn.execute(
+            "DELETE FROM email_queue WHERE id = ?",
+            (email_id,),  # ← 1-tuple, note the comma
+        )
+        self.conn.commit()
+        return (cur.rowcount or 0) > 0
+    
+    #ok = self.email_repo.delete_email_batch_by_id(batch_id)
+
+    def delete_email_batch_by_id(self, batch_id: str) -> bool:
+        """
+        Delete an email batch and all its emails.
+        Returns True if the batch row was deleted, False otherwise.
+        """
+        cur = self.conn.cursor()
+        try:
+            # 1) delete children (no FK cascade in your schema)
+            cur.execute(
+                "DELETE FROM email_queue WHERE batch_id = ?",
+                (batch_id,),   # note the comma → 1-tuple
+            )
+
+            # 2) delete the batch itself
+            cur.execute(
+                "DELETE FROM email_batches WHERE batch_id = ?",
+                (batch_id,),
+            )
+            deleted_batches = cur.rowcount or 0
+
+            self.conn.commit()
+            return deleted_batches > 0
+        except sqlite3.Error:
+            self.conn.rollback()
+            raise
+
+    #self.email_repo.get_email_details_by_id(email_id)
+    def get_email_details_by_id(self, email_id: str) -> Optional[EmailDetailsRecord]:
+        row = self.conn.execute(
+            """
+            SELECT
+              id,
+              batch_id,
+              job_id,
+              contact_id,
+              to_email,
+              body,
+              subject,
+              status,
+              attempts,
+              sent_at,
+              last_error
+            FROM email_queue
+            WHERE id = ?
+            """,
+            (email_id,),
+        ).fetchone()
+
+        if not row:
+            return None
+
+        sent_at_raw = row[9]
+        if isinstance(sent_at_raw, str):
+            try:
+                sent_at = datetime.fromisoformat(sent_at_raw)
+            except ValueError:
+                try:
+                    sent_at = datetime.strptime(sent_at_raw.split('.')[0], "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    sent_at = None
+        else:
+            sent_at = sent_at_raw
+
+        return EmailDetailsRecord(
+            id=row[0],
+            batch_id=row[1],
+            job_id=row[2],
+            contact_id=row[3],
+            to_email=row[4],
+            body=row[5],
+            subject=row[6],
+            status=row[7],
+            attempts=row[8],
+            sent_at=sent_at,
+            last_error=row[10],
+        )
+    
+    # rec = self.email_repo.update_email_fields(
+    #         job_id, email_id, subject=subject, body=body, to_email=to_email, status=status
+    #     )
+
+    def update_email_fields(
+        self,
+        job_id: str,
+        email_id: str,
+        *,
+        subject: Optional[str] = None,
+        body: Optional[str] = None,
+        to_email: Optional[str] = None,
+        status: Optional[str] = None,  # "draft" | "ready"
+    ) -> Optional[EmailDetailsRecord]:
+        """
+        Update only provided fields. Edits are allowed only if current status ∈ ('draft','ready').
+        Returns updated record, or None if not found / not editable.
+        """
+        sets, params = [], []
+        if subject is not None:
+            sets.append("subject = ?")
+            params.append(subject)
+        if body is not None:
+            sets.append("body = ?")
+            params.append(body)
+        if to_email is not None:
+            sets.append("to_email = ?")
+            params.append(to_email)
+        if status is not None:
+            sets.append("status = ?")
+            params.append(status)
+
+        if not sets:
+            return self.get_email_details(job_id, email_id)  # no-op; implement getter below
+
+        cur = self.conn.cursor()
+        try:
+            # Edit only draft/ready emails
+            sql = f"""
+                UPDATE email_queue
+                SET {", ".join(sets)}
+                WHERE id = ? AND job_id = ? AND status IN ('draft','ready')
+            """
+            params.extend([email_id, job_id])
+            cur.execute(sql, params)
+            if (cur.rowcount or 0) == 0:
+                self.conn.rollback()
+                return None
+
+            # Return the updated row
+            cur.execute("""
+                SELECT id, batch_id, job_id, contact_id, to_email, body, subject,
+                       status, attempts, sent_at, COALESCE(last_error, '') as last_error
+                FROM email_queue
+                WHERE id = ? AND job_id = ?
+            """, (email_id, job_id))
+            r = cur.fetchone()
+            self.conn.commit()
+            if not r:
+                return None
+
+            sent_at = r[9]
+            if isinstance(sent_at, str):
+                try:
+                    # sqlite default format "YYYY-MM-DD HH:MM:SS[.ffffff]"
+                    sent_at = datetime.fromisoformat(sent_at.replace(" ", "T"))
+                except Exception:
+                    sent_at = None
+
+            return EmailDetailsRecord(
+                id=r[0], batch_id=r[1], job_id=r[2], contact_id=r[3],
+                to_email=r[4], body=r[5], subject=r[6], status=r[7],
+                attempts=r[8], sent_at=sent_at, last_error=r[10]
+            )
+        except sqlite3.Error:
+            self.conn.rollback()
+            raise
+
+    # This function might be redundant. I could use get_email_details_by_id instead in update_email_fields perhaps, but I don't want to refactor now.
+    def get_email_details(self, job_id: str, email_id: str) -> Optional[EmailDetailsRecord]:
+        cur = self.conn.execute("""
+            SELECT id, batch_id, job_id, contact_id, to_email, body, subject,
+                   status, attempts, sent_at, COALESCE(last_error, '') as last_error
+            FROM email_queue
+            WHERE id = ? AND job_id = ?
+        """, (email_id, job_id))
+        r = cur.fetchone()
+        if not r:
+            return None
+        sent_at = r[9]
+        if isinstance(sent_at, str):
+            try:
+                sent_at = datetime.fromisoformat(sent_at.replace(" ", "T"))
+            except Exception:
+                sent_at = None
+        return EmailDetailsRecord(
+            id=r[0], batch_id=r[1], job_id=r[2], contact_id=r[3],
+            to_email=r[4], body=r[5], subject=r[6], status=r[7],
+            attempts=r[8], sent_at=sent_at, last_error=r[10]
+        )
+
+

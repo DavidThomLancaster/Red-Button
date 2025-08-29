@@ -3,7 +3,7 @@ from Services.UserService import UserService
 from Utils.AuthUtils import hash_password, get_user_id_from_header
 from models.user_models import RegisterRequest, LoginRequest, CreateJobRequest, GetMapResp, PatchOpsReq
 from models.contact_models import ContactSearchRequest, ContactSearchResponse, CreateContactBody
-from models.email_batch_models import JobEmailBatchesDTO, BatchWithHeadersDTO, EmailBatchDTO, EmailHeaderDTO
+from models.email_batch_models import JobEmailBatchesDTO, BatchWithHeadersDTO, EmailBatchDTO, EmailHeaderDTO, EmailDetailsDTO, EmailUpdateDTO
 from Utils.logger import get_logger
 from Services.AuthService import AuthService
 from Services.TokenService import TokenService
@@ -299,8 +299,98 @@ async def get_batches_and_headers(
     except Exception as e:
         log.error("Unexpected error retrieving email batches and headers", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
-
     
+@router.post("/delete_email/job/{job_id}/email/{email_id}")
+async def delete_email(
+    job_id: str,
+    email_id: str,
+    authorization: str = Header(...),
+    job_service: JobService = Depends(get_job_service)
+):
+    try:
+        user_id = get_user_id_from_header(authorization)
+        result = job_service.delete_email(user_id, job_id, email_id)
+        return result  # { "status": "DELETED", "email_id": ... }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Unexpected error deleting email", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
+@router.post("/delete_email_batch/job/{job_id}/batch/{batch_id}")
+async def delete_email(
+    job_id: str,
+    batch_id: str,
+    authorization: str = Header(...),
+    job_service: JobService = Depends(get_job_service)
+):
+    try:
+        user_id = get_user_id_from_header(authorization)
+        result = job_service.delete_email_batch(user_id, job_id, batch_id)
+        return result  # { "status": "DELETED", "email_id": ... }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("Unexpected error deleting email batch", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/get_email_details/job/{job_id}/email/{email_id}", response_model=EmailDetailsDTO)
+async def get_email_details(
+    job_id: str,
+    email_id: str,
+    authorization: str = Header(...),
+    job_service: JobService = Depends(get_job_service)
+):
+    try:
+        log.info("Reached get_email_details handler")
+        user_id = get_user_id_from_header(authorization)
+        rec = job_service.get_email_details(user_id, job_id, email_id)  # EmailDetailsRecord (dataclass)
+
+        # one-liner: validate from attributes of the dataclass
+        return EmailDetailsDTO.model_validate(rec)
+
+    except HTTPException:
+        raise
+    except Exception:
+        log.error("Unexpected error retrieving email details", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
+@router.patch("/jobs/{job_id}/emails/{email_id}", response_model=EmailDetailsDTO)
+async def patch_email(
+    job_id: str,
+    email_id: str,
+    update: EmailUpdateDTO,
+    authorization: str = Header(...),
+    job_service: JobService = Depends(get_job_service),
+):
+    try:
+        user_id = get_user_id_from_header(authorization)
+
+        if not any([update.subject is not None, update.body is not None, update.to_email is not None, update.status is not None]):
+            raise HTTPException(status_code=400, detail="No fields to update.")
+
+        rec = job_service.update_email(
+            user_id, job_id, email_id,
+            subject=update.subject,
+            body=update.body,
+            to_email=update.to_email,
+            status=update.status,
+        )
+        if rec is None:
+            # either not found, wrong job, or not editable (e.g., already sent)
+            raise HTTPException(status_code=409, detail="Email not editable or not found.")
+
+        # DTO from dataclass
+        return EmailDetailsDTO.model_validate(rec)
+
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception:
+        log.error("Unexpected error updating email", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+   
 
 
 # @router.post("/create_job")

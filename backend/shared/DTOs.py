@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional, List, Literal
 from enum import Enum
 from datetime import datetime
 
@@ -54,3 +54,18 @@ class EmailHeaderRecord:
 class BatchWithEmailHeaders:   # domain aggregate
     batch: EmailBatchRecord
     emails: List[EmailHeaderRecord]
+
+@dataclass(frozen=True)
+class EmailDetailsRecord:
+    id: str
+    batch_id: str
+    job_id: str
+    contact_id: str
+    to_email: str
+    body: str
+    subject: str
+    status: str
+    attempts: int
+    sent_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+

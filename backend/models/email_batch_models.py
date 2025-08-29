@@ -1,6 +1,6 @@
 # TODO - Slice 8 - Define the DTOs for the email stuff
 # api/schemas.py
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
 from typing import List, Optional, Literal
 from datetime import datetime
 
@@ -36,3 +36,42 @@ class BatchWithHeadersDTO(BaseModel):
 class JobEmailBatchesDTO(BaseModel):
     job_id: str
     batches: List[BatchWithHeadersDTO]
+
+class EmailDetailsDTO(BaseModel):
+    id: str
+    batch_id: str
+    job_id: str
+    contact_id: str
+    to_email: str
+    body: str
+    subject: str
+    status: str
+    attempts: int
+    sent_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+
+    # allow construction from ORM objects
+    model_config = ConfigDict(from_attributes=True)
+
+
+EditableStatus = Literal["draft", "ready"]  # keep tight
+
+class EmailUpdateDTO(BaseModel):
+    subject: Optional[str] = None
+    body: Optional[str] = None
+    to_email: Optional[EmailStr] = None
+    status: Optional[EditableStatus] = None  # allow toggling draft/ready only
+
+    @field_validator("subject")
+    @classmethod
+    def subject_not_empty(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError("subject cannot be empty")
+        return v
+
+    @field_validator("body")
+    @classmethod
+    def body_not_empty(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError("body cannot be empty")
+        return v
