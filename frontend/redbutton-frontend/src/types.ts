@@ -93,3 +93,16 @@ export interface JobEmailBatchesDTO {
   batches: BatchWithHeadersDTO[];
 }
 
+export interface EmailDetailsDTO {
+  id: string;
+  batch_id: string;
+  job_id: string;
+  contact_id: string;
+  to_email: string;
+  body: string;
+  subject: string;
+  status: EmailStatus | string;
+  attempts: number;
+  sent_at?: string | null;
+  last_error?: string | null;
+}

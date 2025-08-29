@@ -317,7 +317,7 @@ async def delete_email(
         log.error("Unexpected error deleting email", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
     
-@router.post("/delete_email_batch/job/{job_id}/batch/{batch_id}")
+@router.delete("/delete_email_batch/job/{job_id}/batch/{batch_id}")
 async def delete_email(
     job_id: str,
     batch_id: str,

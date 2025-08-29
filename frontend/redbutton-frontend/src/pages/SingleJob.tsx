@@ -162,7 +162,7 @@ const SingleJob: React.FC = () => {
       <section style={{ marginTop: 24 }}>
         <h3>Emails</h3>
         <div style={{ border: "1px solid #e6e6e6", borderRadius: 8, padding: 12, background: "#fafafa" }}>
-          <EmailPanel jobId={jobId} refreshKey={emailRefreshKey} />
+          <EmailPanel jobId={jobId} refreshKey={emailRefreshKey} /> 
         </div>
       </section>
 
