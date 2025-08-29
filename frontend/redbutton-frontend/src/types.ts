@@ -55,3 +55,41 @@ export interface SubmitPdfResponse {
 //   preliminary_contact_map?: ContactMapPreview | null;
 //   status?: string;
 // }
+
+//--------------------------------
+// --- emails DTOs from your GET /jobs/{jobId}/email_batches ---
+export type EmailStatus = "draft" | "ready" | "mock_sent" | "failed";
+
+export interface EmailHeaderDTO {
+  id: string;
+  batch_id: string;
+  job_id: string;
+  contact_id: string;
+  contact_name: string;
+  contact_email: string;
+  trade?: string | null;
+  subject: string;
+  status: EmailStatus;
+  last_updated: string; // ISO
+}
+
+export interface EmailBatchDTO {
+  id: string;
+  job_id: string;
+  template_version: string;
+  created_at: string;    // ISO
+  page_spec?: string | null;
+  page_count?: number | null;
+  count_total?: number | null;
+}
+
+export interface BatchWithHeadersDTO {
+  batch: EmailBatchDTO;
+  emails: EmailHeaderDTO[];
+}
+
+export interface JobEmailBatchesDTO {
+  job_id: string;
+  batches: BatchWithHeadersDTO[];
+}
+

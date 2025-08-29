@@ -7,6 +7,7 @@ import type { GetJobResponse } from "../types";
 
 // 👇 import your panel (adjust the path if needed)
 import { ContactMapPanel } from "../components/ContactMapPanel";
+import { EmailPanel } from "../components/EmailPanel";
 
 const SingleJob: React.FC = () => {
   const { jobId = "" } = useParams();
@@ -18,6 +19,8 @@ const SingleJob: React.FC = () => {
 
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  const [emailRefreshKey, setEmailRefreshKey] = useState(0);
 
   // Maybe do this?
 
@@ -86,13 +89,26 @@ const SingleJob: React.FC = () => {
     if (!token) return;
     try {
       const res: any = await generateEmailsApi(token, jobId);
-      // TODO - I'll probably have to do more then just print the res later
-      console.log(res)
+      console.log(res);
+      // nudge the panel to refetch
+      setEmailRefreshKey((k) => k + 1);
     } catch (e: any) {
       if (e?.status === 401) logout();
       else setErr(e?.message || "Generate emails failed");
     }
   }
+
+  // async function generateEmails() {
+  //   if (!token) return;
+  //   try {
+  //     const res: any = await generateEmailsApi(token, jobId);
+  //     // TODO - I'll probably have to do more then just print the res later
+  //     console.log(res)
+  //   } catch (e: any) {
+  //     if (e?.status === 401) logout();
+  //     else setErr(e?.message || "Generate emails failed");
+  //   }
+  // }
 
   if (loading) return <p style={{ padding: 16 }}>Loading…</p>;
   if (err) return <p style={{ padding: 16, color: "crimson" }}>{err}</p>;
@@ -141,6 +157,12 @@ const SingleJob: React.FC = () => {
         <h3>Contact Map</h3>
         <div style={{ border: "1px solid #e6e6e6", borderRadius: 8, padding: 12, background: "#fafafa" }}>
           <ContactMapPanel key={`cmp:${jobId}:${mapRefreshKey}`} jobId={jobId} />
+        </div>
+      </section>
+      <section style={{ marginTop: 24 }}>
+        <h3>Emails</h3>
+        <div style={{ border: "1px solid #e6e6e6", borderRadius: 8, padding: 12, background: "#fafafa" }}>
+          <EmailPanel jobId={jobId} refreshKey={emailRefreshKey} />
         </div>
       </section>
 
